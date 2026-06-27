@@ -1,5 +1,6 @@
-import { Router, Request, Response } from 'express'
-import { supabase } from '../lib/supabase'
+import { Router } from 'express'
+import type { Request, Response } from 'express'
+import { supabase } from '../lib/supabase.js'
 const router: Router = Router()
 
 router.get('/', async (_req: Request, res: Response) => {

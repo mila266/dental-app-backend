@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express'
+import { Router } from 'express'
+import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
 
 const router: Router = Router()
@@ -75,3 +76,4 @@ router.post('/buscar-dni', async (req: Request, res: Response) => {
 
 
 export default router
+
