@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { authenticateToken } from '../middleware/auth.js'
 const router: Router = Router()
 
 router.get('/', async (_req: Request, res: Response) => {
@@ -49,12 +50,39 @@ router.get('/paciente/:pacienteId', async (req: Request, res: Response) => {
 
 // Ingresar nueva reserva de Cita
 
-router.post('/', async (req: Request, res: Response) => {
-  const { clinica_id, paciente_id, doctor_id, servicio_id, consultorio_id, estado_cita_id, fecha, hora_inicio, hora_fin, precio_cobrado, notas } = req.body
+router.post('/', authenticateToken, async (req: Request, res: Response) => {
+  const { doctor_id, servicio_id, fecha, hora, notas } = req.body
+  const paciente_id = req.user?.id
+
+  if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora) {
+    return res.status(400).json({ error: 'Faltan datos para crear la cita' })
+  }
+
+  // Buscar el estado inicial: "programada"
+  const { data: estadoInicial, error: errorEstado } = await supabase
+    .from('estado_cita')
+    .select('id')
+    .eq('nombre', 'programada')
+    .single()
+
+  if (errorEstado || !estadoInicial) {
+    console.error('Error obteniendo estado inicial:', errorEstado)
+    return res.status(500).json({ error: 'No se encontró el estado inicial de cita' })
+  }
 
   const { data, error } = await supabase
     .from('cita')
-    .insert([{ clinica_id, paciente_id, doctor_id, servicio_id, consultorio_id, estado_cita_id, fecha, hora_inicio, hora_fin, precio_cobrado, notas }])
+    .insert([{
+      paciente_id,
+      doctor_id,
+      servicio_id,
+      fecha,
+      hora_inicio: hora,
+      hora_fin: hora,
+      notas,
+      clinica_id: req.user?.clinica_id ?? null,
+      estado_cita_id: estadoInicial.id,
+    }])
     .select()
 
   if (error) {

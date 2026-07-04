@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
+import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
 
 const router: Router = Router()
@@ -44,13 +45,46 @@ router.post('/login', async (req: Request, res: Response) => {
         return res.status(401).json({ error: 'DNI o fecha de nacimiento incorrectos' })
     }
 
+    const clinica = Array.isArray(resPaciente.clinica)
+        ? resPaciente.clinica[0]
+        : resPaciente.clinica
+
+    const token = jwt.sign(
+        {
+            id: resPaciente.id,
+            nombre: resPaciente.nombre,
+            email: resPaciente.email,
+            role: 'cliente',
+            clinica_id: clinica?.id,
+        },
+        process.env.JWT_SECRET || 'dentalapp-secret',
+        { expiresIn: '8h' }
+    )
+
     return res.json({
         id: resPaciente.id,
         nombre: resPaciente.nombre,
         email: resPaciente.email,
         telefono: resPaciente.telefono,
         clinica: resPaciente.clinica,
+        token,
     })
+})
+
+router.get('/sesion', async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de autenticación requerido' })
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dentalapp-secret') as { id: string; nombre: string; email?: string; role?: string }
+    return res.json({ user: decoded })
+  } catch {
+    return res.status(401).json({ error: 'Token inválido o expirado' })
+  }
 })
 
 router.post('/buscar-dni', async (req: Request, res: Response) => {
