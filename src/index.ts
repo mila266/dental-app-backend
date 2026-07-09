@@ -9,6 +9,8 @@ import especialidadesRouter from './routes/especialidades.js'
 import horariosRouter from './routes/horario.js'
 import pacientesRouter  from './routes/pacientes.js'
 import serviciosRouter  from './routes/servicios.js'
+import reportesRouter  from './routes/reportes.js'
+import userRouter  from './routes/usuarios.js'
 import { supabase } from './lib/supabase.js'
 
 const app = express()
@@ -25,6 +27,8 @@ app.use('/api/especialidades', especialidadesRouter)
 app.use('/api/horarios', horariosRouter)
 app.use('/api/pacientes', pacientesRouter)
 app.use('/api/servicios', serviciosRouter)
+app.use('/api/reportes', reportesRouter)
+app.use('/api/usuarios', userRouter)
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })

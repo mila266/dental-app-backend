@@ -7,6 +7,7 @@ export type AuthUser = {
   email?: string
   role?: string
   clinica_id?: string
+  doctor_id?: string
 }
 
 declare global {

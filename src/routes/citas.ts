@@ -48,17 +48,93 @@ router.get('/paciente/:pacienteId', async (req: Request, res: Response) => {
   res.json(data)
 })
 
+router.get('/ocupadas', async (req: Request, res: Response) => {
+  const { doctor_id, fecha } = req.query
+
+  if (!doctor_id || !fecha) {
+    return res.status(400).json({ error: 'Faltan doctor_id o fecha' })
+  }
+
+  const { data, error } = await supabase
+    .from('cita')
+    .select(`
+      hora_inicio, hora_fin,
+      estado_cita!inner (nombre)
+    `)
+    .eq('doctor_id', doctor_id as string)
+    .eq('fecha', fecha as string)
+    .neq('estado_cita.nombre', 'cancelada')
+
+  if (error) {
+    console.error('Error Supabase:', error)
+    return res.status(500).json({ error: error.message })
+  }
+
+  const horarios = (data ?? []).map((c: any) => ({
+    hora_inicio: c.hora_inicio,
+    hora_fin: c.hora_fin,
+  }))
+
+  res.json(horarios)
+})
+
+router.get('/mias', authenticateToken, async (req: Request, res: Response) => {
+  const paciente_id = req.user?.id
+  const { doctor_id, especialidad_id } = req.query
+
+  if (!paciente_id) {
+    return res.status(401).json({ error: 'No autenticado' })
+  }
+  if (!doctor_id || !especialidad_id) {
+    return res.status(400).json({ error: 'Faltan doctor_id o especialidad_id' })
+  }
+
+  const { data, error } = await supabase
+    .from('cita')
+    .select(`
+      fecha,
+      servicio!inner (especialidad_id),
+      estado_cita!inner (nombre)
+    `)
+    .eq('paciente_id', paciente_id)
+    .eq('doctor_id', doctor_id as string)
+    .eq('servicio.especialidad_id', especialidad_id as string)
+    .neq('estado_cita.nombre', 'cancelada')
+
+  if (error) {
+    console.error('Error Supabase:', error)
+    return res.status(500).json({ error: error.message })
+  }
+
+  const fechas = (data ?? []).map((c: any) => ({ fecha: c.fecha }))
+  res.json(fechas)
+})
+
 // Ingresar nueva reserva de Cita
 
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
-  const { doctor_id, servicio_id, fecha, hora, notas } = req.body
+  const { doctor_id, servicio_id, consultorio_id, fecha, hora_inicio, hora_fin, notas } = req.body
   const paciente_id = req.user?.id
 
-  if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora) {
+  if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora_inicio || !hora_fin) {
     return res.status(400).json({ error: 'Faltan datos para crear la cita' })
   }
 
-  // Buscar el estado inicial: "programada"
+  const evitarCitaDuplicadaenDiayDoctor = await supabase
+    .from('cita')
+    .select('id, fecha, hora_inicio')
+    .eq('doctor_id', doctor_id)
+    .eq('paciente_id', paciente_id)
+    .eq('fecha', fecha)
+
+  if (evitarCitaDuplicadaenDiayDoctor.data && evitarCitaDuplicadaenDiayDoctor.data.length > 0) {
+    return res.status(409).json({
+      code: "CITA_DUPLICADA",
+      message: "Ya existe una cita para este doctor en la fecha seleccionada."
+    })
+  }
+
+  // Buscar el estado initial: "programada"
   const { data: estadoInicial, error: errorEstado } = await supabase
     .from('estado_cita')
     .select('id')
@@ -76,9 +152,10 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       paciente_id,
       doctor_id,
       servicio_id,
+      consultorio_id,
       fecha,
-      hora_inicio: hora,
-      hora_fin: hora,
+      hora_inicio: hora_inicio,
+      hora_fin: hora_fin,
       notas,
       clinica_id: req.user?.clinica_id ?? null,
       estado_cita_id: estadoInicial.id,

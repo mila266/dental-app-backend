@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
+import { authenticateToken } from '../middleware/auth'
+import { requireRole } from '../middleware/requireRole'
 
 const router: Router = Router()
 
@@ -32,6 +34,24 @@ router.get('/', async (_req: Request, res: Response) => {
   res.json(data)
 
 })
+
+router.get('/:doctorId/especialidades', authenticateToken,requireRole(['admin']), async (req: Request, res: Response) => {
+    const { doctorId } = req.params
+
+    const { data, error } = await supabase
+      .from('doctor_especialidad')
+      .select('especialidad(id,nombre)')
+      .eq('doctor_id', doctorId)
+
+    if (error) {
+      console.error('Error Supabase:', error)
+      return res.status(500).json({ error: error.message })
+    }
+
+    const especialidades = data?.map(fila => fila.especialidad) ?? []
+    res.json(especialidades)
+  }
+)
 
 export default router
 

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
+import { authenticateToken } from '../middleware/auth'
+import { requireRole } from '../middleware/requireRole'
 
 const router: Router = Router()
 
@@ -54,7 +56,7 @@ router.post('/login', async (req: Request, res: Response) => {
             id: resPaciente.id,
             nombre: resPaciente.nombre,
             email: resPaciente.email,
-            role: 'cliente',
+            role: 'paciente',
             clinica_id: clinica?.id,
         },
         process.env.JWT_SECRET || 'dentalapp-secret',
@@ -70,6 +72,8 @@ router.post('/login', async (req: Request, res: Response) => {
         token,
     })
 })
+
+
 
 router.get('/sesion', async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization
@@ -109,5 +113,36 @@ router.post('/buscar-dni', async (req: Request, res: Response) => {
 })
 
 
-export default router
+router.get('/doctor/:doctorId/ocupacion', authenticateToken, requireRole(['admin']), async (req: Request, res: Response) => {
+  const { doctorId } = req.params
 
+  const { data: horarios, error: errorHorarios } = await supabase
+    .from('horario_doctor')
+    .select('id, dia_semana, hora_inicio, hora_fin, consultorio(id,nombre), fecha_inicio, fecha_fin')
+    .eq('doctor_id', doctorId)
+    .eq('activo', true)
+    .order('dia_semana', { ascending: true })
+
+  if (errorHorarios) return res.status(500).json({ error: errorHorarios.message })
+
+  const ESTADOS_PENDIENTES = ['programada', 'confirmada', 'en_curso']
+
+  const resultado = await Promise.all(
+    (horarios ?? []).map(async (h) => {
+      const { count, error } = await supabase
+        .from('cita')
+        .select('id, estado_cita!inner(nombre)', { count: 'exact', head: true })
+        .eq('doctor_id', doctorId)
+        .gte('fecha', new Date().toISOString().split('T')[0])
+        .gte('hora_inicio', h.hora_inicio)
+        .lt('hora_inicio', h.hora_fin)
+        .in('estado_cita.nombre', ESTADOS_PENDIENTES)
+
+      return { ...h, citas_pendientes: error ? 0 : count ?? 0 }
+    })
+  )
+
+  res.json(resultado)
+})
+
+export default router
