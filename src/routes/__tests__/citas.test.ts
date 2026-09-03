@@ -106,3 +106,35 @@ describe('GET /api/citas/mias-completas', () => {
     assert.deepEqual(res.body, [{ id: 'cita-1', fecha: '2026-01-01' }])
   })
 })
+
+describe('POST /api/citas (validación Zod)', () => {
+  test('rechaza con 400 VALIDATION_ERROR si falta hora_fin', async () => {
+    const res = await request(buildApp())
+      .post('/api/citas')
+      .set('Authorization', `Bearer ${tokenFor('paciente', 'paciente-1')}`)
+      .send({ doctor_id: 'd1', servicio_id: 's1', consultorio_id: 'c1', fecha: '2026-01-01', hora_inicio: '09:00' })
+
+    assert.equal(res.status, 400)
+    assert.equal(res.body.code, 'VALIDATION_ERROR')
+  })
+})
+
+describe('GET /api/citas/ocupadas (validación Zod)', () => {
+  test('rechaza con 400 VALIDATION_ERROR si faltan doctor_id o fecha', async () => {
+    const res = await request(buildApp()).get('/api/citas/ocupadas').query({ doctor_id: 'd1' })
+
+    assert.equal(res.status, 400)
+    assert.equal(res.body.code, 'VALIDATION_ERROR')
+  })
+})
+
+describe('GET /api/citas/mias (validación Zod)', () => {
+  test('rechaza con 400 VALIDATION_ERROR si faltan doctor_id o especialidad_id', async () => {
+    const res = await request(buildApp())
+      .get('/api/citas/mias')
+      .set('Authorization', `Bearer ${tokenFor('paciente', 'paciente-1')}`)
+
+    assert.equal(res.status, 400)
+    assert.equal(res.body.code, 'VALIDATION_ERROR')
+  })
+})
