@@ -1,8 +1,16 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
+import { z } from 'zod'
 import { supabase } from '../lib/supabase.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { validateQuery } from '../lib/validate.js'
+
+const fechaSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Debe tener formato YYYY-MM-DD')
+const kpisFinancierosQuerySchema = z.object({
+  desde: fechaSchema.optional(),
+  hasta: fechaSchema.optional(),
+})
 
 const router: Router = Router()
 
@@ -63,8 +71,8 @@ router.get('/dashboard-admin', authenticateToken, requireRole(['admin']), async 
   }
 })
 
-router.get('/kpis-financieros', authenticateToken, requireRole(['contador', 'admin']), async (req: Request, res: Response) => {
-  const { desde, hasta } = req.query
+router.get('/kpis-financieros', authenticateToken, requireRole(['contador', 'admin']), validateQuery(kpisFinancierosQuerySchema), async (req: Request, res: Response) => {
+  const { desde, hasta } = req.validatedQuery as { desde?: string; hasta?: string }
 
   const { data, error } = await supabase
     .from('cita')

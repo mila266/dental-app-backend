@@ -1,12 +1,17 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
+import { z } from 'zod'
 import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { validateParams } from '../lib/validate'
+
+const especialidadIdParamSchema = z.object({ especialidadId: z.string().min(1) })
+const doctorIdParamSchema = z.object({ doctorId: z.string().min(1) })
 
 const router: Router = Router()
 
-router.get('/especialidad/:especialidadId', async (req: Request, res: Response) => {
+router.get('/especialidad/:especialidadId', validateParams(especialidadIdParamSchema), async (req: Request, res: Response) => {
   const { especialidadId } = req.params
 
   const { data, error } = await supabase
@@ -35,7 +40,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
 })
 
-router.get('/:doctorId/especialidades', authenticateToken,requireRole(['admin']), async (req: Request, res: Response) => {
+router.get('/:doctorId/especialidades', authenticateToken, requireRole(['admin']), validateParams(doctorIdParamSchema), async (req: Request, res: Response) => {
     const { doctorId } = req.params
 
     const { data, error } = await supabase

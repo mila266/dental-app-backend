@@ -22,23 +22,6 @@ export async function listarHorariosDeDoctor(req: Request, res: Response) {
 export async function crearHorarioHandler(req: Request, res: Response) {
   const { especialidad_id, doctor_id, consultorio_id, dias_semana, hora_inicio, hora_fin, fecha_inicio, fecha_fin } = req.body
 
-  if (!doctor_id || !especialidad_id || !consultorio_id || !hora_inicio || !hora_fin || !fecha_inicio) {
-    return res.status(400).json({ error: 'Todos los campos son obligatorios (incluyendo fecha_inicio)' })
-  }
-
-  if (!Array.isArray(dias_semana) || dias_semana.length === 0) {
-    return res.status(400).json({ error: 'dias_semana debe ser un arreglo con al menos un día' })
-  }
-  if (dias_semana.some((d: number) => d < 1 || d > 7)) {
-    return res.status(400).json({ error: 'Cada día debe estar entre 1 (lunes) y 7 (domingo)' })
-  }
-  if (hora_inicio >= hora_fin) {
-    return res.status(400).json({ error: 'La hora de inicio debe ser menor a la hora de fin' })
-  }
-  if (fecha_fin && fecha_fin < fecha_inicio) {
-    return res.status(400).json({ error: 'fecha_fin no puede ser anterior a fecha_inicio' })
-  }
-
   // Verificar que el doctor realmente tenga esa especialidad asignada
   const { data: relacion, error: errorRelacion } = await supabase
     .from('doctor_especialidad')

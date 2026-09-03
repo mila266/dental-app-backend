@@ -1,6 +1,10 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
+import { z } from 'zod'
 import { supabase } from '../lib/supabase'
+import { validateParams } from '../lib/validate'
+
+const especialidadIdParamSchema = z.object({ especialidadId: z.string().min(1) })
 
 const router: Router = Router()
 
@@ -17,7 +21,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
 })
 
-router.get('/especialidad/:especialidadId', async (req: Request, res: Response) => {
+router.get('/especialidad/:especialidadId', validateParams(especialidadIdParamSchema), async (req: Request, res: Response) => {
     const { especialidadId } = req.params
 
     const { data, error } = await supabase

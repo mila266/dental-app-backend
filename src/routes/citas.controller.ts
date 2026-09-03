@@ -50,11 +50,7 @@ export async function misCitasCompletas(req: Request, res: Response) {
 }
 
 export async function citasOcupadas(req: Request, res: Response) {
-  const { doctor_id, fecha } = req.query
-
-  if (!doctor_id || !fecha) {
-    return res.status(400).json({ error: 'Faltan doctor_id o fecha' })
-  }
+  const { doctor_id, fecha } = req.validatedQuery as { doctor_id: string; fecha: string }
 
   const { data, error } = await supabase
     .from('cita')
@@ -62,8 +58,8 @@ export async function citasOcupadas(req: Request, res: Response) {
       hora_inicio, hora_fin,
       estado_cita!inner (nombre)
     `)
-    .eq('doctor_id', doctor_id as string)
-    .eq('fecha', fecha as string)
+    .eq('doctor_id', doctor_id)
+    .eq('fecha', fecha)
     .neq('estado_cita.nombre', 'cancelada')
 
   if (error) {
@@ -81,13 +77,10 @@ export async function citasOcupadas(req: Request, res: Response) {
 
 export async function misCitas(req: Request, res: Response) {
   const paciente_id = req.user?.sub
-  const { doctor_id, especialidad_id } = req.query
+  const { doctor_id, especialidad_id } = req.validatedQuery as { doctor_id: string; especialidad_id: string }
 
   if (!paciente_id) {
     return res.status(401).json({ error: 'No autenticado' })
-  }
-  if (!doctor_id || !especialidad_id) {
-    return res.status(400).json({ error: 'Faltan doctor_id o especialidad_id' })
   }
 
   const { data, error } = await supabase
@@ -98,8 +91,8 @@ export async function misCitas(req: Request, res: Response) {
       estado_cita!inner (nombre)
     `)
     .eq('paciente_id', paciente_id)
-    .eq('doctor_id', doctor_id as string)
-    .eq('servicio.especialidad_id', especialidad_id as string)
+    .eq('doctor_id', doctor_id)
+    .eq('servicio.especialidad_id', especialidad_id)
     .neq('estado_cita.nombre', 'cancelada')
 
   if (error) {
@@ -115,8 +108,8 @@ export async function crearCitaHandler(req: Request, res: Response) {
   const { doctor_id, servicio_id, consultorio_id, fecha, hora_inicio, hora_fin, notas } = req.body
   const paciente_id = req.user?.sub
 
-  if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora_inicio || !hora_fin) {
-    return res.status(400).json({ error: 'Faltan datos para crear la cita' })
+  if (!paciente_id) {
+    return res.status(401).json({ error: 'No autenticado' })
   }
 
   const yaExiste = await verificarCitaDuplicada(supabase, { doctorId: doctor_id, pacienteId: paciente_id, fecha })

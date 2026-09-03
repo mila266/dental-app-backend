@@ -1,6 +1,14 @@
 import { Router } from 'express'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { validateBody, validateParams } from '../lib/validate'
+import {
+  crearHorarioBodySchema,
+  actualizarHorarioBodySchema,
+  idParamSchema,
+  doctorIdParamSchema,
+  especialidadDoctorParamsSchema,
+} from './horario.schema'
 import {
   listarHorariosDeDoctor,
   crearHorarioHandler,
@@ -10,9 +18,9 @@ import {
 
 const router: Router = Router()
 
-router.get('/doctor/:doctorId', authenticateToken, requireRole(['admin']), listarHorariosDeDoctor)
-router.post('/', authenticateToken, requireRole(['admin']), crearHorarioHandler)
-router.patch('/:id', authenticateToken, requireRole(['admin']), actualizarHorarioHandler)
-router.get('/:especialidadId/:doctorId', horariosPorEspecialidadYDoctor)
+router.get('/doctor/:doctorId', authenticateToken, requireRole(['admin']), validateParams(doctorIdParamSchema), listarHorariosDeDoctor)
+router.post('/', authenticateToken, requireRole(['admin']), validateBody(crearHorarioBodySchema), crearHorarioHandler)
+router.patch('/:id', authenticateToken, requireRole(['admin']), validateParams(idParamSchema), validateBody(actualizarHorarioBodySchema), actualizarHorarioHandler)
+router.get('/:especialidadId/:doctorId', validateParams(especialidadDoctorParamsSchema), horariosPorEspecialidadYDoctor)
 
 export default router
