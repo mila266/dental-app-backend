@@ -1,10 +1,9 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
-import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
-import { env } from '../lib/env'
+import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
 
 const router: Router = Router()
 
@@ -52,17 +51,18 @@ router.post('/login', async (req: Request, res: Response) => {
         ? resPaciente.clinica[0]
         : resPaciente.clinica
 
-    const token = jwt.sign(
-        {
-            sub: resPaciente.id,
-            role: 'paciente',
-            clinica_id: clinica?.id ?? null,
-            tokenVersion: resPaciente.token_version,
-            type: 'access',
-        },
-        env.JWT_ACCESS_SECRET,
-        { expiresIn: '8h' }
-    )
+    const token = signAccessToken({
+        sub: resPaciente.id,
+        role: 'paciente',
+        clinica_id: clinica?.id ?? null,
+        tokenVersion: resPaciente.token_version,
+    })
+
+    setRefreshCookie(res, signRefreshToken({
+        sub: resPaciente.id,
+        role: 'paciente',
+        tokenVersion: resPaciente.token_version,
+    }))
 
     return res.json({
         id: resPaciente.id,

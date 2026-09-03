@@ -1,11 +1,10 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
-import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
 import bcrypt from 'bcryptjs'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
-import { env } from '../lib/env'
+import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
 
 const router: Router = Router()
 
@@ -77,17 +76,18 @@ router.post('/login-personal', async (req: Request, res: Response) => {
         return res.status(401).json({ error: 'Credenciales incorrectas' })
     }
 
-    const token = jwt.sign(
-        {
-            sub: usuario.id,
-            role: usuario.role,
-            clinica_id: usuario.clinica_id,
-            tokenVersion: usuario.token_version,
-            type: 'access',
-        },
-        env.JWT_ACCESS_SECRET,
-        { expiresIn: '8h' }
-    )
+    const token = signAccessToken({
+        sub: usuario.id,
+        role: usuario.role,
+        clinica_id: usuario.clinica_id,
+        tokenVersion: usuario.token_version,
+    })
+
+    setRefreshCookie(res, signRefreshToken({
+        sub: usuario.id,
+        role: usuario.role,
+        tokenVersion: usuario.token_version,
+    }))
 
     return res.json({
         id: usuario.id,
