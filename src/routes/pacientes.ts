@@ -1,9 +1,12 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
-import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
+import { loginLimiter } from '../middleware/rateLimit'
+import { validateBody } from '../lib/validate'
+import { loginPacienteSchema } from '../lib/schemas'
 
 const router: Router = Router()
 
@@ -19,16 +22,12 @@ router.get('/', async (_req: Request, res: Response) => {
     res.json(data)
 })
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, validateBody(loginPacienteSchema), async (req: Request, res: Response) => {
     const { dni, fechaNacimiento } = req.body
-
-    if (!dni || !fechaNacimiento) {
-        return res.status(400).json({ error: 'DNI y fecha de nacimiento son obligatorios' })
-    }
 
     const { data, error } = await supabase
         .from('paciente')
-        .select('id,clinica(id,nombre),nombre,email,telefono,fecha_nacimiento')
+        .select('id,clinica(id,nombre),nombre,email,telefono,fecha_nacimiento,token_version')
         .eq('dni', dni)
         .eq('fecha_nacimiento', fechaNacimiento)
 
@@ -51,17 +50,18 @@ router.post('/login', async (req: Request, res: Response) => {
         ? resPaciente.clinica[0]
         : resPaciente.clinica
 
-    const token = jwt.sign(
-        {
-            id: resPaciente.id,
-            nombre: resPaciente.nombre,
-            email: resPaciente.email,
-            role: 'paciente',
-            clinica_id: clinica?.id,
-        },
-        process.env.JWT_SECRET || 'dentalapp-secret',
-        { expiresIn: '8h' }
-    )
+    const token = signAccessToken({
+        sub: resPaciente.id,
+        role: 'paciente',
+        clinica_id: clinica?.id ?? null,
+        tokenVersion: resPaciente.token_version,
+    })
+
+    setRefreshCookie(res, signRefreshToken({
+        sub: resPaciente.id,
+        role: 'paciente',
+        tokenVersion: resPaciente.token_version,
+    }))
 
     return res.json({
         id: resPaciente.id,
@@ -75,20 +75,8 @@ router.post('/login', async (req: Request, res: Response) => {
 
 
 
-router.get('/sesion', async (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null
-
-  if (!token) {
-    return res.status(401).json({ error: 'Token de autenticación requerido' })
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dentalapp-secret') as { id: string; nombre: string; email?: string; role?: string }
-    return res.json({ user: decoded })
-  } catch {
-    return res.status(401).json({ error: 'Token inválido o expirado' })
-  }
+router.get('/sesion', authenticateToken, (req: Request, res: Response) => {
+  return res.json({ user: req.user })
 })
 
 router.post('/buscar-dni', async (req: Request, res: Response) => {

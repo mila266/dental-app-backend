@@ -1,13 +1,13 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import { env } from '../lib/env'
 
 export type AuthUser = {
-  id: string
-  nombre: string
-  email?: string
-  role?: string
-  clinica_id?: string
-  doctor_id?: string
+  sub: string
+  role: string
+  clinica_id: string | null
+  tokenVersion: number
+  type?: 'access' | 'refresh'
 }
 
 declare global {
@@ -27,10 +27,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dentalapp-secret') as AuthUser
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthUser
     req.user = decoded
     next()
-  } catch {
-    return res.status(401).json({ error: 'Token inválido o expirado' })
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ error: 'Token expirado', code: 'TOKEN_EXPIRED' })
+    }
+    return res.status(401).json({ error: 'Token inválido', code: 'TOKEN_INVALID' })
   }
 }

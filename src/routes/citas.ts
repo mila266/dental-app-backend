@@ -8,11 +8,11 @@ router.get('/', async (_req: Request, res: Response) => {
   const { data, error } = await supabase
     .from('cita')
     .select(` id, fecha, hora_inicio, hora_fin, precio_cobrado, tiempo_real_fin, notas, created_at,
-      clinica(id,nombre), 
-      paciente (id, nombre, email, telefono ), 
-      doctor (id, nombre, email ), 
-      servicio (id, nombre, duracion_minutos, precio_referencial,especialidad (id, nombre, icono)), 
-      consultorio (id, nombre, tipo_consultorio (nombre)), 
+      clinica(id,nombre),
+      paciente (id, nombre, email, telefono ),
+      doctor (id, nombre, email ),
+      servicio (id, nombre, duracion_minutos, precio_referencial,especialidad (id, nombre, icono)),
+      consultorio (id, nombre, tipo_consultorio (nombre)),
       estado_cita (id, nombre, color_fondo, color_texto )`)
     .order('fecha', { ascending: false })
 
@@ -79,7 +79,7 @@ router.get('/ocupadas', async (req: Request, res: Response) => {
 })
 
 router.get('/mias', authenticateToken, async (req: Request, res: Response) => {
-  const paciente_id = req.user?.id
+  const paciente_id = req.user?.sub
   const { doctor_id, especialidad_id } = req.query
 
   if (!paciente_id) {
@@ -114,7 +114,7 @@ router.get('/mias', authenticateToken, async (req: Request, res: Response) => {
 
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   const { doctor_id, servicio_id, consultorio_id, fecha, hora_inicio, hora_fin, notas } = req.body
-  const paciente_id = req.user?.id
+  const paciente_id = req.user?.sub
 
   if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora_inicio || !hora_fin) {
     return res.status(400).json({ error: 'Faltan datos para crear la cita' })
