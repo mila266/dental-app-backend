@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import { env } from '../lib/env'
 
 export type AuthUser = {
   id: string
@@ -27,7 +28,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dentalapp-secret') as AuthUser
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as AuthUser
     req.user = decoded
     next()
   } catch {

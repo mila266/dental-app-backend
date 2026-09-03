@@ -5,13 +5,12 @@ import { supabase } from '../lib/supabase'
 import bcrypt from 'bcryptjs'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { env } from '../lib/env'
 
 const router: Router = Router()
 
 router.post('/', authenticateToken, requireRole(['admin']), async (req: Request, res: Response) => {
     const { nombre, email, password, role, doctor_id, clinica_id } = req.body
-
-    console.log("Creando usuario:", { nombre, email, role, doctor_id })
 
     if (!nombre || !email || !password || !role) {
         return res.status(400).json({ error: "Faltan completar campos obligatorios" })
@@ -61,8 +60,6 @@ router.post('/login-personal', async (req: Request, res: Response) => {
         .select('id,nombre,email,password_hash,role,doctor_id,clinica_id,activo')
         .eq('email', email)
 
-    console.log(email)
-
     if (error) {
         console.error('Error Supabase:', error)
         return res.status(500).json({ error: error.message })
@@ -70,10 +67,7 @@ router.post('/login-personal', async (req: Request, res: Response) => {
 
     const usuario = data?.[0]
 
-    console.log(data)
-
     if (!usuario) {
-        console.log("Usuario no encontrado")
         return res.status(401).json({ error: 'Credenciales incorrectas' })
     }
 
@@ -92,7 +86,7 @@ router.post('/login-personal', async (req: Request, res: Response) => {
             clinica_id: usuario.clinica_id,
             doctor_id: usuario.doctor_id,
         },
-        process.env.JWT_SECRET || 'dentalapp-secret',
+        env.JWT_ACCESS_SECRET,
         { expiresIn: '8h' }
     )
 

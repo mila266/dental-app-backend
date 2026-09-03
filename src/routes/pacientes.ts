@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { env } from '../lib/env'
 
 const router: Router = Router()
 
@@ -59,7 +60,7 @@ router.post('/login', async (req: Request, res: Response) => {
             role: 'paciente',
             clinica_id: clinica?.id,
         },
-        process.env.JWT_SECRET || 'dentalapp-secret',
+        env.JWT_ACCESS_SECRET,
         { expiresIn: '8h' }
     )
 
@@ -84,7 +85,7 @@ router.get('/sesion', async (req: Request, res: Response) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dentalapp-secret') as { id: string; nombre: string; email?: string; role?: string }
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { id: string; nombre: string; email?: string; role?: string }
     return res.json({ user: decoded })
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' })
