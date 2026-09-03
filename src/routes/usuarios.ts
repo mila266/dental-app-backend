@@ -6,28 +6,14 @@ import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { requireActiveSession } from '../middleware/requireActiveSession'
 import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
+import { loginLimiter } from '../middleware/rateLimit'
+import { validateBody } from '../lib/validate'
+import { loginPersonalSchema, crearUsuarioSchema } from '../lib/schemas'
 
 const router: Router = Router()
 
-router.post('/', authenticateToken, requireActiveSession, requireRole(['admin']), async (req: Request, res: Response) => {
+router.post('/', authenticateToken, requireActiveSession, requireRole(['admin']), validateBody(crearUsuarioSchema), async (req: Request, res: Response) => {
     const { nombre, email, password, role, doctor_id, clinica_id } = req.body
-
-    if (!nombre || !email || !password || !role) {
-        return res.status(400).json({ error: "Faltan completar campos obligatorios" })
-    }
-
-    if (password.length < 8) {
-        return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" })
-    }
-
-    const rolesValidos = ['doctor', 'recepcionista', 'admin', 'contador']
-    if (!rolesValidos.includes(role)) {
-        return res.status(400).json({ error: "Rol inválido" })
-    }
-
-    if (role === 'doctor' && !doctor_id) {
-        return res.status(400).json({ error: "Falta doctor_id para usuario con rol doctor" })
-    }
 
     const password_hash = await bcrypt.hash(password, 12)
 
@@ -48,12 +34,8 @@ router.post('/', authenticateToken, requireActiveSession, requireRole(['admin'])
     return res.status(201).json({ message: 'Usuario creado', data })
 })
 
-router.post('/login-personal', async (req: Request, res: Response) => {
+router.post('/login-personal', loginLimiter, validateBody(loginPersonalSchema), async (req: Request, res: Response) => {
     const { email, password } = req.body
-
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email y contraseña son obligatorios' })
-    }
 
     const { data, error } = await supabase
         .from('usuario')

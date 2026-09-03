@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
+import { loginLimiter } from '../middleware/rateLimit'
+import { validateBody } from '../lib/validate'
+import { loginPacienteSchema } from '../lib/schemas'
 
 const router: Router = Router()
 
@@ -19,12 +22,8 @@ router.get('/', async (_req: Request, res: Response) => {
     res.json(data)
 })
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, validateBody(loginPacienteSchema), async (req: Request, res: Response) => {
     const { dni, fechaNacimiento } = req.body
-
-    if (!dni || !fechaNacimiento) {
-        return res.status(400).json({ error: 'DNI y fecha de nacimiento son obligatorios' })
-    }
 
     const { data, error } = await supabase
         .from('paciente')
