@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test src/**/__tests__/*.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
+    "pino": "^9.6.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -30,6 +32,8 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.0.0",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
