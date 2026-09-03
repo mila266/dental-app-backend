@@ -4,11 +4,12 @@ import { supabase } from '../lib/supabase'
 import bcrypt from 'bcryptjs'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { requireActiveSession } from '../middleware/requireActiveSession'
 import { signAccessToken, signRefreshToken, setRefreshCookie } from '../lib/tokens'
 
 const router: Router = Router()
 
-router.post('/', authenticateToken, requireRole(['admin']), async (req: Request, res: Response) => {
+router.post('/', authenticateToken, requireActiveSession, requireRole(['admin']), async (req: Request, res: Response) => {
     const { nombre, email, password, role, doctor_id, clinica_id } = req.body
 
     if (!nombre || !email || !password || !role) {
