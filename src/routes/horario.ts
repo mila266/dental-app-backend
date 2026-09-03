@@ -3,6 +3,8 @@ import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
 import { authenticateToken } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
+import { validarSolapamiento } from './horario.service'
+import { logger } from '../lib/logger'
 
 const router: Router = Router()
 
@@ -16,7 +18,7 @@ router.get('/doctor/:doctorId', authenticateToken, requireRole(['admin']), async
     .order('dia_semana', { ascending: true })
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase en GET /api/horarios/doctor/:doctorId')
     return res.status(500).json({ error: error.message })
   }
   res.json(data)
@@ -51,67 +53,22 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req: Request,
     .maybeSingle()
 
   if (errorRelacion) {
-    console.error('Error Supabase:', errorRelacion)
+    logger.error({ err: errorRelacion }, 'Error Supabase verificando doctor_especialidad')
     return res.status(500).json({ error: errorRelacion.message })
   }
   if (!relacion) {
     return res.status(400).json({ error: 'Este doctor no tiene asignada esa especialidad' })
   }
 
-  const fechaFinFiltro = fecha_fin ?? '9999-12-31'
-
-  const errores: { dia_semana: number; motivo: string }[] = []
-
-  for (const dia of dias_semana) {
-    // a) cruce contra el propio doctor, mismo día, sin importar consultorio
-    const { data: cruceDoctor, error: errCruceDoctor } = await supabase
-      .from('horario_doctor')
-      .select('id, hora_inicio, hora_fin')
-      .eq('doctor_id', doctor_id)
-      .eq('dia_semana', dia)
-      .eq('activo', true)
-      .lt('hora_inicio', hora_fin)
-      .gt('hora_fin', hora_inicio)
-      .lte('fecha_inicio', fechaFinFiltro)
-      .or(`fecha_fin.is.null,fecha_fin.gte.${fecha_inicio}`)
-
-    if (errCruceDoctor) {
-      console.error('Error Supabase:', errCruceDoctor)
-      return res.status(500).json({ error: errCruceDoctor.message })
-    }
-    if (cruceDoctor && cruceDoctor.length > 0) {
-      errores.push({
-        dia_semana: dia,
-        motivo: `El doctor ya tiene un horario que se cruza este día (${cruceDoctor[0].hora_inicio}-${cruceDoctor[0].hora_fin})`,
-      })
-      continue
-    }
-
-    // b) consultorio ocupado por OTRO doctor, mismo día, rango de fechas cruzado
-    const { data: cruceConsultorio, error: errCruceConsultorio } = await supabase
-      .from('horario_doctor')
-      .select('id, hora_inicio, hora_fin, doctor:doctor_id(nombre)')
-      .eq('consultorio_id', consultorio_id)
-      .eq('dia_semana', dia)
-      .eq('activo', true)
-      .neq('doctor_id', doctor_id)
-      .lt('hora_inicio', hora_fin)
-      .gt('hora_fin', hora_inicio)
-      .lte('fecha_inicio', fechaFinFiltro)
-      .or(`fecha_fin.is.null,fecha_fin.gte.${fecha_inicio}`)
-
-    if (errCruceConsultorio) {
-      console.error('Error Supabase:', errCruceConsultorio)
-      return res.status(500).json({ error: errCruceConsultorio.message })
-    }
-    if (cruceConsultorio && cruceConsultorio.length > 0) {
-      const otro = cruceConsultorio[0] as any
-      errores.push({
-        dia_semana: dia,
-        motivo: `El consultorio ya está en uso por Dr. ${otro.doctor?.nombre ?? 'otro doctor'} ese día (${otro.hora_inicio}-${otro.hora_fin}) dentro de ese rango de fechas`,
-      })
-    }
-  }
+  const errores = await validarSolapamiento(supabase, {
+    doctorId: doctor_id,
+    consultorioId: consultorio_id,
+    diasSemana: dias_semana,
+    horaInicio: hora_inicio,
+    horaFin: hora_fin,
+    fechaInicio: fecha_inicio,
+    fechaFin: fecha_fin ?? null,
+  })
 
   if (errores.length > 0) {
     return res.status(409).json({
@@ -138,7 +95,7 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req: Request,
     .select()
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase insertando horario_doctor')
     return res.status(500).json({ error: error.message })
   }
 
@@ -188,7 +145,7 @@ router.patch('/:id', authenticateToken, requireRole(['admin']), async (req: Requ
   })
 
   if (errorCitas) {
-    console.error('Error Supabase:', errorCitas)
+    logger.error({ err: errorCitas }, 'Error Supabase en RPC citas_fuera_de_rango')
     return res.status(500).json({ error: errorCitas.message })
   }
 
@@ -224,7 +181,7 @@ router.get('/:especialidadId/:doctorId', async (_req: Request, res: Response) =>
 
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase en GET /api/horarios/:especialidadId/:doctorId')
     return res.status(500).json({ error: error.message })
   }
   res.json(data)
@@ -232,4 +189,3 @@ router.get('/:especialidadId/:doctorId', async (_req: Request, res: Response) =>
 })
 
 export default router
-

@@ -3,6 +3,8 @@ import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { verificarCitaDuplicada, crearCita } from './citas.service.js'
+import { logger } from '../lib/logger.js'
 const router: Router = Router()
 
 router.get('/', authenticateToken, requireRole(['admin', 'recepcionista']), async (_req: Request, res: Response) => {
@@ -18,7 +20,7 @@ router.get('/', authenticateToken, requireRole(['admin', 'recepcionista']), asyn
     .order('fecha', { ascending: false })
 
   if (error) {
-    console.error('Error Supabase', error);
+    logger.error({ err: error }, 'Error Supabase en GET /api/citas')
     return res.status(500).json({ error: error.message })
   }
 
@@ -46,7 +48,7 @@ router.get('/mias-completas', authenticateToken, async (req: Request, res: Respo
     .order('fecha', { ascending: false })
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase en GET /api/citas/mias-completas')
     return res.status(500).json({ error: error.message })
   }
 
@@ -71,7 +73,7 @@ router.get('/ocupadas', async (req: Request, res: Response) => {
     .neq('estado_cita.nombre', 'cancelada')
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase en GET /api/citas/ocupadas')
     return res.status(500).json({ error: error.message })
   }
 
@@ -107,7 +109,7 @@ router.get('/mias', authenticateToken, async (req: Request, res: Response) => {
     .neq('estado_cita.nombre', 'cancelada')
 
   if (error) {
-    console.error('Error Supabase:', error)
+    logger.error({ err: error }, 'Error Supabase en GET /api/citas/mias')
     return res.status(500).json({ error: error.message })
   }
 
@@ -121,60 +123,32 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   const { doctor_id, servicio_id, consultorio_id, fecha, hora_inicio, hora_fin, notas } = req.body
   const paciente_id = req.user?.sub
 
-  if (!paciente_id || !doctor_id || !servicio_id || !fecha || !hora_inicio || !hora_fin) {
-    return res.status(400).json({ error: 'Faltan datos para crear la cita' })
+  if (!paciente_id) {
+    return res.status(401).json({ error: 'No autenticado' })
   }
 
-  const evitarCitaDuplicadaenDiayDoctor = await supabase
-    .from('cita')
-    .select('id, fecha, hora_inicio')
-    .eq('doctor_id', doctor_id)
-    .eq('paciente_id', paciente_id)
-    .eq('fecha', fecha)
+  const yaExiste = await verificarCitaDuplicada(supabase, { doctorId: doctor_id, pacienteId: paciente_id, fecha })
 
-  if (evitarCitaDuplicadaenDiayDoctor.data && evitarCitaDuplicadaenDiayDoctor.data.length > 0) {
+  if (yaExiste) {
     return res.status(409).json({
-      code: "CITA_DUPLICADA",
-      message: "Ya existe una cita para este doctor en la fecha seleccionada."
+      code: 'CITA_DUPLICADA',
+      message: 'Ya existe una cita para este doctor en la fecha seleccionada.',
     })
   }
 
-  // Buscar el estado initial: "programada"
-  const { data: estadoInicial, error: errorEstado } = await supabase
-    .from('estado_cita')
-    .select('id')
-    .eq('nombre', 'programada')
-    .single()
-
-  if (errorEstado || !estadoInicial) {
-    console.error('Error obteniendo estado inicial:', errorEstado)
-    return res.status(500).json({ error: 'No se encontró el estado inicial de cita' })
-  }
-
-  const { data, error } = await supabase
-    .from('cita')
-    .insert([{
-      paciente_id,
-      doctor_id,
-      servicio_id,
-      consultorio_id,
-      fecha,
-      hora_inicio: hora_inicio,
-      hora_fin: hora_fin,
-      notas,
-      clinica_id: req.user?.clinica_id ?? null,
-      estado_cita_id: estadoInicial.id,
-    }])
-    .select()
-
-  if (error) {
-    console.error('Error Supabase:', error)
-    return res.status(500).json({ error: error.message })
-  }
+  const data = await crearCita(supabase, {
+    paciente_id,
+    doctor_id,
+    servicio_id,
+    consultorio_id,
+    fecha,
+    hora_inicio,
+    hora_fin,
+    notas,
+    clinica_id: req.user?.clinica_id ?? null,
+  })
 
   res.status(201).json({ message: 'Cita creada', data })
 })
-
-
 
 export default router
