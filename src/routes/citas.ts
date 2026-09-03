@@ -2,9 +2,10 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticateToken } from '../middleware/auth.js'
+import { requireRole } from '../middleware/requireRole.js'
 const router: Router = Router()
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', authenticateToken, requireRole(['admin', 'recepcionista']), async (_req: Request, res: Response) => {
   const { data, error } = await supabase
     .from('cita')
     .select(` id, fecha, hora_inicio, hora_fin, precio_cobrado, tiempo_real_fin, notas, created_at,
@@ -24,10 +25,14 @@ router.get('/', async (_req: Request, res: Response) => {
   res.json(data)
 })
 
-// Buscar Cita por paciente
+// Citas completas del paciente autenticado
 
-router.get('/paciente/:pacienteId', async (req: Request, res: Response) => {
-  const { pacienteId } = req.params
+router.get('/mias-completas', authenticateToken, async (req: Request, res: Response) => {
+  const paciente_id = req.user?.sub
+
+  if (!paciente_id) {
+    return res.status(401).json({ error: 'No autenticado' })
+  }
 
   const { data, error } = await supabase
     .from('cita')
@@ -37,7 +42,7 @@ router.get('/paciente/:pacienteId', async (req: Request, res: Response) => {
       servicio (id,nombre,duracion_minutos,especialidad (nombre,icono)),
       estado_cita (nombre,color_fondo,color_texto)
     `)
-    .eq('paciente_id', pacienteId)
+    .eq('paciente_id', paciente_id)
     .order('fecha', { ascending: false })
 
   if (error) {
