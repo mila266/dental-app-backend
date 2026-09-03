@@ -57,7 +57,7 @@ router.post('/login-personal', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
         .from('usuario')
-        .select('id,nombre,email,password_hash,role,doctor_id,clinica_id,activo')
+        .select('id,nombre,email,password_hash,role,doctor_id,clinica_id,activo,token_version')
         .eq('email', email)
 
     if (error) {
@@ -79,12 +79,11 @@ router.post('/login-personal', async (req: Request, res: Response) => {
 
     const token = jwt.sign(
         {
-            id: usuario.id,
-            nombre: usuario.nombre,
-            email: usuario.email,
+            sub: usuario.id,
             role: usuario.role,
             clinica_id: usuario.clinica_id,
-            doctor_id: usuario.doctor_id,
+            tokenVersion: usuario.token_version,
+            type: 'access',
         },
         env.JWT_ACCESS_SECRET,
         { expiresIn: '8h' }

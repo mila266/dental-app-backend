@@ -29,7 +29,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
         .from('paciente')
-        .select('id,clinica(id,nombre),nombre,email,telefono,fecha_nacimiento')
+        .select('id,clinica(id,nombre),nombre,email,telefono,fecha_nacimiento,token_version')
         .eq('dni', dni)
         .eq('fecha_nacimiento', fechaNacimiento)
 
@@ -54,11 +54,11 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const token = jwt.sign(
         {
-            id: resPaciente.id,
-            nombre: resPaciente.nombre,
-            email: resPaciente.email,
+            sub: resPaciente.id,
             role: 'paciente',
-            clinica_id: clinica?.id,
+            clinica_id: clinica?.id ?? null,
+            tokenVersion: resPaciente.token_version,
+            type: 'access',
         },
         env.JWT_ACCESS_SECRET,
         { expiresIn: '8h' }
@@ -76,20 +76,8 @@ router.post('/login', async (req: Request, res: Response) => {
 
 
 
-router.get('/sesion', async (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null
-
-  if (!token) {
-    return res.status(401).json({ error: 'Token de autenticación requerido' })
-  }
-
-  try {
-    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { id: string; nombre: string; email?: string; role?: string }
-    return res.json({ user: decoded })
-  } catch {
-    return res.status(401).json({ error: 'Token inválido o expirado' })
-  }
+router.get('/sesion', authenticateToken, (req: Request, res: Response) => {
+  return res.json({ user: req.user })
 })
 
 router.post('/buscar-dni', async (req: Request, res: Response) => {
