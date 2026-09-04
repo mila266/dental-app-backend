@@ -16,6 +16,7 @@ import serviciosRouter  from './routes/servicios.js'
 import reportesRouter  from './routes/reportes.js'
 import userRouter  from './routes/usuarios.js'
 import { supabase } from './lib/supabase.js'
+import { logger } from './lib/logger.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -55,8 +56,15 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
-
+// Error handler centralizado: captura lo que no se maneja en cada ruta
+// (excepciones no controladas, promesas rechazadas )
+// No reemplaza los `if (error) {...}` ya existentes en cada ruta.
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err }, 'Error no controlado')
+  const status = typeof err?.status === 'number' ? err.status : 500
+  res.status(status).json({ error: err?.message || 'Error interno del servidor' })
+})
 
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`)
+  logger.info(`Servidor corriendo en http://localhost:${PORT}`)
 })
